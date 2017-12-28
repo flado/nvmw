@@ -1,8 +1,8 @@
-**SORRY, nvmw is no longer maintained. If someone wants to keep maintained, contact me by [email](mailto://hakobera@gmail.com) or [twitter](https://twitter.com/hakobera).**
-
 Node Version Manager for Windows
 ================================
-nvmw is a simple Node Version Manager for Windows.
+nvmw is a simple Node Version Manager for Windows (Fork of git://github.com/hakobera/nvmw.git).
+The fork fixes issue in latest node versions. After node v6.x, the npm is bundled wtih node.exe in the same ZIP file.
+
 
 Prerequisites
 -------------
@@ -17,7 +17,7 @@ Installation
 
 Clone this repository:
 
-    git clone git://github.com/hakobera/nvmw.git "%HOMEDRIVE%%HOMEPATH%\.nvmw"
+    git clone git://github.com/flado/nvmw.git "%HOMEDRIVE%%HOMEPATH%\.nvmw"
 
 To activate nvmw, add nvmw directory to your PATH environment variable
 
@@ -77,15 +77,3 @@ FAQ
 ### Q. Node.exe download faild caused 'Input Error: There is no script engine for file extension ".js"'
 
 Maybe you associated ".js" file to another app, not JScript engine. To fix, see [here](http://www.winhelponline.com/articles/230/1/Error-There-is-no-script-engine-for-file-extension-when-running-js-files.html)
-
-LICENSE
--------
-(The MIT License)
-
-Copyright (c) 2011 Kazuyuki Honda <hakobera@gmail.com>
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
