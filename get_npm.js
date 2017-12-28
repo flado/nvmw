@@ -10,6 +10,7 @@ var BASE_URL = NVMW_NPM_MIRROR + '/v%s.zip';
 
 var targetDir = process.argv[2];
 var versions = process.argv[3].split('/');
+var nodeVersion = process.argv[4];
 var binType = versions[0];
 var binVersion = versions[1];
 
@@ -41,14 +42,19 @@ if (binType === 'iojs') {
     downloadNpmZip(npmVersion);
   });
 } else {
-  var pkgUri = util.format(NPM_PKG_JSON_URL, 'joyent/node',
-    binVersion === 'latest' ? 'master' : binVersion);
-  wget(pkgUri, function (filename, pkg) {
-    if (filename === null) {
-      return noNpmAndExit();
-    }
-    downloadNpmZip(JSON.parse(pkg).version);
-  });
+  if (nodeVersion < 4) {
+    var pkgUri = util.format(NPM_PKG_JSON_URL, 'joyent/node',
+      binVersion === 'latest' ? 'master' : binVersion);
+    wget(pkgUri, function (filename, pkg) {
+      if (filename === null) {
+        return noNpmAndExit();
+      }
+      downloadNpmZip(JSON.parse(pkg).version);
+    });
+  } else {
+    //use old 2.14.18 as default 'npm' version - can be upgraded anytime to a more recent version: npm install -g npm@4.6.1
+    downloadNpmTgz('http://registry.npmjs.org/npm/-/npm-2.14.18.tgz');
+  }
 }
 
 function noNpmAndExit() {
@@ -68,6 +74,21 @@ function downloadNpmZip(version) {
         return console.error(err.message);
       }
       console.log('Download npm %s is done', version);
+    });
+  });
+}
+
+function downloadNpmTgz(uri) {
+  wget(uri, function (filename, data) {
+    if (filename === null) {
+        console.error('Can\'t get npm: ' + uri);
+        process.exit(1);
+    }
+    fs.writeFile(path.join(targetDir, 'npm.tgz'), data, function (err) {
+      if (err) {
+        return console.error(err.message);
+      }
+      console.log('Download npm v2.14.18 is done');
     });
   });
 }

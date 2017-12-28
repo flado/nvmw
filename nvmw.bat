@@ -134,13 +134,24 @@ if %NODE_TYPE% == iojs (
   if %ARCH% == x32 (
     set NODE_EXE_URL=%NVMW_NODEJS_ORG_MIRROR%/%NODE_VERSION%/node.exe
   ) else (
-    set NODE_EXE_URL=%NVMW_NODEJS_ORG_MIRROR%/%NODE_VERSION%/x64/node.exe
+    if %NODE_VERSION:~1,1% == 0 (
+      set NODE_EXE_URL=%NVMW_NODEJS_ORG_MIRROR%/%NODE_VERSION%/x64/node.exe
+    ) else (
+      if %NODE_VERSION:~1,1% GEQ 6 (
+        rem #### from v6.x NPM is bundled into the same ZIP file with node.exe ####
+        rem https://nodejs.org/dist/v8.9.3/node-v8.9.3-win-x64.zip
+        set NODE_ZIP_URL=%NVMW_NODEJS_ORG_MIRROR%/%NODE_VERSION%/node-%NODE_VERSION%-win-x64.zip
+      ) else (
+        rem #### from v1. to 5.x there is no ZIP file with both node & npm
+        set NODE_EXE_URL=%NVMW_NODEJS_ORG_MIRROR%/%NODE_VERSION%/win-x64/node.exe
+      )
+    )
   )
 )
 
-set "NODE_HOME=%NVMW_HOME%%NODE_VERSION%"
+set "NODE_HOME=%NVMW_HOME%.node-repository\%NODE_VERSION%"
 if %NODE_TYPE% == iojs (
-  set "NODE_HOME=%NVMW_HOME%%NODE_TYPE%\%NODE_VERSION%"
+  set "NODE_HOME=%NVMW_HOME%.node-repository%NODE_TYPE%\%NODE_VERSION%"
 )
 
 if not %ARCH% == %OS_ARCH% (
@@ -150,47 +161,92 @@ if not %ARCH% == %OS_ARCH% (
 set "NODE_EXE_FILE=%NODE_HOME%\%NODE_TYPE%.exe"
 set "NPM_ZIP_FILE=%NODE_HOME%\npm.zip"
 
+if %NODE_VERSION:~1,1% GEQ 6 (
+  set "NODE_ZIP_FILE=%NODE_HOME%\node-%NODE_VERSION%-win-x64.zip"
+)
+
+set "NPM_TGZ_FILE=%NODE_HOME%\npm.tgz"
+
 if exist "%NODE_EXE_FILE%" (
   endlocal
   echo "%NODE_TYPE%/%NODE_VERSION% (%ARCH%)" already exists, please uninstall it first
   exit /b 1
 )
 
+
+REM echo ### Setting BT proxy for "winhttp" ...
+REM netsh winhttp set proxy gatehousek1.stgeorge.com.au:8080
+
 mkdir "%NODE_HOME%"
 
 echo Start installing %NODE_TYPE%/%NODE_VERSION% (%ARCH%) to %NODE_HOME%
 
-cscript //nologo "%NVMW_HOME%\fget.js" %NODE_EXE_URL% "%NODE_EXE_FILE%"
 
-if not exist "%NODE_EXE_FILE%" (
-  echo Download %NODE_EXE_FILE% from %NODE_EXE_URL% failed
-  goto install_error
-) else (
-  if %NODE_TYPE% == iojs (
-    copy "%NVMW_HOME%\alias-node.cmd" "%NODE_HOME%\node.cmd"
-  )
+if %NODE_VERSION:~1,1% GEQ 6 (
 
-  echo Start install npm
+  echo ### Download nodeJS from %NODE_ZIP_URL% ...
+  cscript //nologo "%NVMW_HOME%\fget.js" %NODE_ZIP_URL% "%NODE_ZIP_FILE%"
 
-  "%NODE_EXE_FILE%" "%NVMW_HOME%\get_npm.js" "%NODE_HOME%" "%NODE_TYPE%/%NODE_VERSION%"
-  if not exist "%NPM_ZIP_FILE%" goto install_error
+  echo ### Start unzip "%NODE_ZIP_FILE%" to "%NODE_HOME%"
+  cscript //nologo "%NVMW_HOME%\unzip.js" "%NODE_ZIP_FILE%\node-%NODE_VERSION%-win-x64" "%NODE_HOME%"
 
-  set "CD_ORG=%CD%"
-  %~d0
-  cd "%NODE_HOME%"
-  echo Start unzip "%NPM_ZIP_FILE%" to "%NODE_HOME%"
-  cscript //nologo "%NVMW_HOME%\unzip.js" "%NPM_ZIP_FILE%" "%NODE_HOME%"
-  mkdir "%NODE_HOME%\node_modules"
-  rmdir /s /q "%NODE_HOME%\node_modules\npm"
-  move npm-* "%NODE_HOME%\node_modules\npm"
-  copy "%NODE_HOME%\node_modules\npm\bin\npm.cmd" "%NODE_HOME%\npm.cmd"
-  cd "%CD_ORG%"
-  if not exist "%NODE_HOME%\npm.cmd" goto install_error
-  echo npm install ok
-
-  echo Finished
+  echo ### Finished installing %NODE_VERSION% ###
   endlocal
   exit /b 0
+
+) else (
+  echo Download %NODE_EXE_FILE% from %NODE_EXE_URL% ...
+  cscript //nologo "%NVMW_HOME%\fget.js" %NODE_EXE_URL% "%NODE_EXE_FILE%"
+
+  if not exist "%NODE_EXE_FILE%" (
+    echo Download %NODE_EXE_FILE% from %NODE_EXE_URL% failed
+    goto install_error
+  ) else (
+
+    echo NODE_EXE_FILE: %NODE_EXE_FILE%
+
+    if %NODE_TYPE% == iojs (
+      copy "%NVMW_HOME%\alias-node.cmd" "%NODE_HOME%\node.cmd"
+    )
+
+      echo Start install npm
+      "%NODE_EXE_FILE%" "%NVMW_HOME%\get_npm.js" "%NODE_HOME%" "%NODE_TYPE%/%NODE_VERSION%" "%NODE_VERSION:~1,1%"
+      if %NODE_VERSION:~1,1% LSS 4 (
+        if not exist "%NPM_ZIP_FILE%" goto install_error
+      ) else (
+        if not exist "%NPM_TGZ_FILE%" goto install_error
+      )
+
+      set "CD_ORG=%CD%"
+      %~d0
+      cd "%NODE_HOME%"
+
+      if %NODE_VERSION:~1,1% LSS 4 (
+        echo Start unzip "%NPM_ZIP_FILE%" to "%NODE_HOME%"
+        cscript //nologo "%NVMW_HOME%\unzip.js" "%NPM_ZIP_FILE%" "%NODE_HOME%"
+      ) else (
+        echo Start decompress "%NPM_TGZ_FILE%" to "%NODE_HOME%"
+        cscript //nologo "%NVMW_HOME%\untgz.js" "%NPM_TGZ_FILE%"
+      )
+
+      mkdir "%NODE_HOME%\node_modules"
+      rmdir /s /q "%NODE_HOME%\node_modules\npm"
+      if %NODE_VERSION:~1,1% LSS 4 (
+        move npm-* "%NODE_HOME%\node_modules\npm"
+      ) else (
+        move package "%NODE_HOME%\node_modules\npm"
+      )
+
+      copy "%NODE_HOME%\node_modules\npm\bin\npm.cmd" "%NODE_HOME%\npm.cmd"
+      cd "%CD_ORG%"
+      if not exist "%NODE_HOME%\npm.cmd" goto install_error
+
+      echo npm install ok
+
+    echo Finished
+    endlocal
+    exit /b 0
+  )
 )
 :install_error
   rd /Q /S "%NODE_HOME%"
@@ -247,9 +303,9 @@ if "%NVMW_CURRENT_TYPE%" == "%NODE_TYPE%" if "%NVMW_CURRENT%" == "%NODE_VERSION%
   exit /b 1
 )
 
-set "NODE_HOME=%NVMW_HOME%%NODE_VERSION%"
+set "NODE_HOME=%NVMW_HOME%.node-repository\%NODE_VERSION%"
 if %NODE_TYPE% == iojs (
-  set "NODE_HOME=%NVMW_HOME%%NODE_TYPE%\%NODE_VERSION%"
+  set "NODE_HOME=%NVMW_HOME%.node-repository\%NODE_TYPE%\%NODE_VERSION%"
 )
 
 if not %ARCH% == %OS_ARCH% (
@@ -316,9 +372,9 @@ if not %NODE_VERSION:~0,1% == v if not %NODE_VERSION:~0,1% == l (
   set NODE_VERSION=v%NODE_VERSION%
 )
 
-set "NODE_HOME=%NVMW_HOME%%NODE_VERSION%"
+set "NODE_HOME=%NVMW_HOME%.node-repository\%NODE_VERSION%"
 if %NODE_TYPE% == iojs (
-  set "NODE_HOME=%NVMW_HOME%%NODE_TYPE%\%NODE_VERSION%"
+  set "NODE_HOME=%NVMW_HOME%.node-repository\%NODE_TYPE%\%NODE_VERSION%"
 )
 
 if not %ARCH% == %OS_ARCH% (
@@ -369,9 +425,9 @@ if not %NVMW_CURRENT:~0,1% == v if not %NVMW_CURRENT:~0,1% == l (
 
 echo Now using %NVMW_CURRENT_TYPE% %NVMW_CURRENT% %NVMW_CURRENT_ARCH%
 
-set "NODE_HOME=%NVMW_HOME%%NODE_VERSION%"
+set "NODE_HOME=%NVMW_HOME%.node-repository\%NODE_VERSION%"
 if %NVMW_CURRENT_TYPE% == iojs (
-  set "NODE_HOME=%NVMW_HOME%%NODE_TYPE%\%NODE_VERSION%"
+  set "NODE_HOME=%NVMW_HOME%.node-repository\%NODE_TYPE%\%NODE_VERSION%"
 )
 
 if not %NVMW_CURRENT_ARCH% == %OS_ARCH% (
@@ -381,11 +437,11 @@ if not %NVMW_CURRENT_ARCH% == %OS_ARCH% (
 )
 
 if %NVMW_CURRENT_TYPE% == iojs (
-  set "PATH=%NVMW_HOME%;%NVMW_HOME%%NVMW_CURRENT_TYPE%\%NVMW_CURRENT%%NVMW_CURRENT_ARCH_PADDING%;%PATH_ORG%"
-  set "NODE_PATH=%NVMW_HOME%%NVMW_CURRENT_TYPE%\%NVMW_CURRENT%%NVMW_CURRENT_ARCH_PADDING%\node_modules"
+  set "PATH=%NVMW_HOME%;%NVMW_HOME%.node-repository\%NVMW_CURRENT_TYPE%\%NVMW_CURRENT%%NVMW_CURRENT_ARCH_PADDING%;%PATH_ORG%"
+  set "NODE_PATH=%NVMW_HOME%.node-repository\%NVMW_CURRENT_TYPE%\%NVMW_CURRENT%%NVMW_CURRENT_ARCH_PADDING%\node_modules"
 ) else (
-  set "PATH=%NVMW_HOME%;%NVMW_HOME%\%NVMW_CURRENT%%NVMW_CURRENT_ARCH_PADDING%;%PATH_ORG%"
-  set "NODE_PATH=%NVMW_HOME%\%NVMW_CURRENT%%NVMW_CURRENT_ARCH_PADDING%\node_modules"
+  set "PATH=%NVMW_HOME%;%NVMW_HOME%.node-repository\%NVMW_CURRENT%%NVMW_CURRENT_ARCH_PADDING%;%PATH_ORG%"
+  set "NODE_PATH=%NVMW_HOME%.node-repository\%NVMW_CURRENT%%NVMW_CURRENT_ARCH_PADDING%\node_modules"
 )
 
 exit /b 0
@@ -397,13 +453,13 @@ exit /b 0
 setlocal
 
 echo node:
-if exist "%NVMW_HOME%" (
-  dir "%NVMW_HOME%v*" /b /ad
+if exist "%NVMW_HOME%.node-repository\" (
+  dir "%NVMW_HOME%.node-repository\v*" /b /ad
 )
 echo;
 echo iojs:
-if exist "%NVMW_HOME%iojs" (
-  dir "%NVMW_HOME%iojs\*" /b /ad
+if exist "%NVMW_HOME%.node-repository\iojs" (
+  dir "%NVMW_HOME%.node-repository\iojs\*" /b /ad
 )
 echo;
 
@@ -413,5 +469,9 @@ if not defined NVMW_CURRENT (
   set NVMW_CURRENT_V=%NVMW_CURRENT%
 )
 echo Current: %NVMW_CURRENT_TYPE%/%NVMW_CURRENT_V% %NVMW_CURRENT_ARCH%
+
+REM echo ### Resetting "winhttp" proxy ....
+REM netsh winhttp reset proxy
+
 endlocal
 exit /b 0
